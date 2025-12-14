@@ -1,72 +1,91 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator } from "react-native";
-import { CandlestickChart } from "react-native-wagmi-charts";
+import React, { useEffect, useState } from "react";
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from "react-native";
+
+// Components
+import Chart from "./components/Chart";
+import TrendMeter from "./components/TrendMeter";
+import SupportResistance from "./components/SupportResistance";
+import EmaSignals from "./components/EmaSignals";
+
+// Utils
+import { fetchData } from "./utils/fetchData.js";
+import signalEngine from "./utils/signalEngine";
 
 export default function App() {
-  const [data, setData] = useState([]);
+  const [candles, setCandles] = useState([]);
+  const [signal, setSignal] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(
-      "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=50"
-    )
-      .then((response) => response.json())
-      .then((json) => {
-        const formatted = json.map((item) => ({
-          timestamp: item[0],
-          open: parseFloat(item[1]),
-          high: parseFloat(item[2]),
-          low: parseFloat(item[3]),
-          close: parseFloat(item[4]),
-        }));
-        setData(formatted);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    loadMarketData();
+
+    const interval = setInterval(() => {
+      loadMarketData();
+    }, 5000); // हर 5 सेकंड में अपडेट
+
+    return () => clearInterval(interval);
   }, []);
+
+  async function loadMarketData() {
+    setLoading(true);
+    const data = await fetchData();
+    setCandles(data);
+    setSignal(signalEngine(data));
+    setLoading(false);
+  }
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.center}>
-        <ActivityIndicator size="large" color="#00FF99" />
-        <Text style={{ color: "white", marginTop: 10 }}>Loading chart...</Text>
-      </SafeAreaView>
+      <View style={styles.loadingBox}>
+        <ActivityIndicator size="large" color="#00FFAA" />
+        <Text style={{ color: "white", marginTop: 10 }}>Loading market data...</Text>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>CandleEye</Text>
+    <ScrollView style={styles.container}>
+      <Text style={styles.header}>🔥 CandleEye — Smart Market Analysis</Text>
 
-      <View style={{ height: 350, marginTop: 20 }}>
-        <CandlestickChart.Provider data={data}>
-          <CandlestickChart height={350}>
-            <CandlestickChart.Candles />
-            <CandlestickChart.Crosshair />
-          </CandlestickChart>
-        </CandlestickChart.Provider>
-      </View>
-    </SafeAreaView>
+      {/* Chart */}
+      <Chart data={candles} />
+
+      {/* Trend Meter */}
+      <TrendMeter candles={candles} />
+
+      {/* Support / Resistance */}
+      <SupportResistance candles={candles} />
+
+      {/* EMA Signals */}
+      <EmaSignals signal={signal} />
+
+      <Text style={styles.footer}>Market updates every 5 sec…</Text>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     backgroundColor: "#000",
-    paddingTop: 40,
-    paddingHorizontal: 10,
+    padding: 10,
+    flex: 1,
   },
-  center: {
+  header: {
+    textAlign: "center",
+    color: "#00FFAA",
+    fontSize: 25,
+    fontWeight: "bold",
+    marginVertical: 15,
+  },
+  loadingBox: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#000",
   },
-  title: {
+  footer: {
+    color: "#666",
     textAlign: "center",
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#00FF99",
+    marginVertical: 20,
   },
 });
